@@ -1,8 +1,14 @@
 from django.shortcuts import render, redirect
 from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic import ListView, DetailView
-from .models import Cat, Toy
+import uuid
+import boto3
+from .models import Cat, Toy, Photo
 from .forms import FeedingForm
+
+# Add these "constants"
+S3_BASE_URL = 'https://s3-us-west-1.amazonaws.com/'   #this is how you access S3
+BUCKET = 'cat-collector-jr-83'
 
 class CatCreate(CreateView):
   model = Cat
@@ -46,6 +52,20 @@ def add_feeding(request, cat_id):
     new_feeding = form.save(commit=False)
     new_feeding.cat_id = cat_id
     new_feeding.save()
+  return redirect('detail', cat_id=cat_id)
+
+def add_photo(request, cat_id):
+  photo_file = request.FILES.get('photo-file', None)
+  if photo_file:
+    s3=boto3.client('s3')
+    key = uuid.uuid4().hex[:6] + photo_file.name[photo_file.name.rfind('.'):]
+    try:
+      s3.upload_fileobj(photo_file, BUCKET, key)
+      url = f"{S3_BASE_URL}{BUCKET}/{key}"
+      photo = Photo(url=url, cat_id=cat_id)
+      photo.save()
+    except:
+      print('An error occurred')
   return redirect('detail', cat_id=cat_id)
 
 def assoc_toy(request, cat_id, toy_id):
